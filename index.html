@@ -3,11 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Aether Network - Multi-Vault Hub</title>
+  <title>Aether Network - Multi-Vault WebAR Hub</title>
   
-  <!-- Leaflet CSS for Map Features -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
   <style>
     :root {
       --bg-dark: #0f172a;
@@ -56,8 +53,7 @@
     .progress-bar { width: 0%; height: 100%; background: var(--accent); transition: width 0.3s; }
 
     .quest-card, .escrow-card { background: var(--bg-dark); padding: 15px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 10px; }
-    #map { height: 350px; width: 100%; border-radius: 8px; margin-top: 15px; border: 1px solid var(--border); }
-
+    
     .error-msg { color: var(--danger); font-size: 0.85rem; margin-top: 10px; display: none; text-align: center; }
     .success-msg { color: var(--success); font-size: 0.85rem; margin-top: 10px; display: none; }
   </style>
@@ -100,7 +96,7 @@
     <div class="tabs">
       <button class="tab-btn active" data-tab="tab1">Self-Farm Vault</button>
       <button class="tab-btn" data-tab="tab2">Global Quests</button>
-      <button class="tab-btn" data-tab="tab3">Geo-Drops</button>
+      <button class="tab-btn" data-tab="tab3">Geo-Drops (WebAR)</button>
       <button class="tab-btn" data-tab="tab4">Escrow Vaults</button>
     </div>
 
@@ -134,14 +130,27 @@
       </div>
     </div>
 
-    <!-- TAB 3: ACCOUNT GEO-DROPS & CREATOR -->
+    <!-- TAB 3: WEBAR CAMERA GEO-DROPS & CREATOR -->
     <div id="tab3" class="tab-panel">
-      <h2>Account Geo-Drops</h2>
-      <p style="color: var(--text-sub); font-size: 0.9rem; margin-top: 5px;">Includes random account initial drops + network host drops. Get within 1m to claim via WebXR AR.</p>
+      <h2>Live WebAR Geo-Drops</h2>
+      <p style="color: var(--text-sub); font-size: 0.9rem; margin-top: 5px;">Scan your physical environment with the camera to locate and claim account drops & custom drops in real time.</p>
       
+      <!-- WEBAR CAMERA VIEWPORT -->
+      <div style="position: relative; width: 100%; height: 380px; overflow: hidden; background: #000; border-radius: 8px; margin-top: 15px; border: 1px solid var(--border);">
+        <video id="ar-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+        <canvas id="ar-canvas" style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;"></canvas>
+
+        <div style="position: absolute; bottom: 10px; left: 10px; right: 10px; display: flex; gap: 8px;">
+          <button id="start-ar-btn" class="btn" style="flex:1; margin:0; padding:10px; font-size:0.85rem;">📷 Start AR Camera</button>
+          <button id="btnCheckGeo" class="btn btn-secondary" style="flex:1; margin:0; padding:10px; font-size:0.85rem; color:#fff; border-color:var(--accent);">⚡ Claim Nearest Drop</button>
+        </div>
+      </div>
+      <p id="geoStatus" class="success-msg" style="margin-top: 10px;"></p>
+
+      <!-- CUSTOM DROP FORM -->
       <div style="margin-top: 15px; background: var(--bg-dark); padding: 15px; border-radius: 8px; border: 1px solid var(--border);">
-        <h4 style="margin-bottom: 10px; color: var(--accent);">Create Custom Geo-Drop</h4>
-        <input type="text" id="geoName" placeholder="Drop Name (e.g. Central Park Vault)" style="width:100%; padding:8px; margin-bottom:8px; background:var(--card-bg); border:1px solid var(--border); color:#fff; border-radius:4px;">
+        <h4 style="margin-bottom: 10px; color: var(--accent);">Anchor Custom Geo-Drop</h4>
+        <input type="text" id="geoName" placeholder="Drop Name (e.g. Central Vault)" style="width:100%; padding:8px; margin-bottom:8px; background:var(--card-bg); border:1px solid var(--border); color:#fff; border-radius:4px;">
         <div style="display: flex; gap: 10px; margin-bottom: 8px;">
           <input type="number" step="any" id="geoLat" placeholder="Latitude (e.g. 2.7258)" style="width:50%; padding:8px; background:var(--card-bg); border:1px solid var(--border); color:#fff; border-radius:4px;">
           <input type="number" step="any" id="geoLng" placeholder="Longitude (e.g. 102.2350)" style="width:50%; padding:8px; background:var(--card-bg); border:1px solid var(--border); color:#fff; border-radius:4px;">
@@ -150,12 +159,8 @@
           <input type="number" id="geoReward" placeholder="Reward Pool (AETH)" style="width:50%; padding:8px; background:var(--card-bg); border:1px solid var(--border); color:#fff; border-radius:4px;">
           <button class="btn btn-secondary" id="btnUseCurrentLoc" style="width:50%; margin:0; padding:8px; font-size:0.85rem;">Use My Location</button>
         </div>
-        <button class="btn" id="btnCreateGeoDrop">Host Custom Geo-Drop</button>
+        <button class="btn" id="btnCreateGeoDrop">Anchor Drop to Firebase</button>
       </div>
-
-      <div id="map"></div>
-      <button class="btn" id="btnCheckGeo" style="margin-top: 15px;">Claim Nearest Geo-Drop (Launch WebXR AR)</button>
-      <p id="geoStatus" class="success-msg"></p>
     </div>
 
     <!-- TAB 4: PURE ESCROW VAULTS -->
@@ -175,12 +180,6 @@
       </div>
     </div>
   </div>
-
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-  <!-- Three.js for Native WebXR AR -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
   <!-- FIREBASE APPLICATION MODULE -->
   <script type="module">
@@ -226,10 +225,11 @@
     const googleProvider = new GoogleAuthProvider();
 
     let currentUser = null;
-    let map = null;
-    let mapMarkers = {}; 
     let activeGeoDrops = {}; 
-    let pendingARClaim = null;
+    let arVideo = document.getElementById('ar-video');
+    let arCanvas = document.getElementById('ar-canvas');
+    let ctx = arCanvas.getContext('2d');
+    let isArActive = false;
 
     // DOM Elements
     const authScreen = document.getElementById('authScreen');
@@ -332,22 +332,19 @@
       }
     }
 
-    // AUTH STATE MONITORING (OPTION 3: INSTANT UI TRANSITION)
+    // AUTH STATE MONITORING
     onAuthStateChanged(auth, (user) => {
       if (user) {
         currentUser = user;
 
-        // Immediately show UI
         authScreen.style.display = 'none';
         appScreen.style.display = 'flex';
 
-        // Background initialization
         initializeUserProfile(user).then(() => {
           bindUserData();
           bindQuests();
           bindEscrows();
           bindGeoDrops();
-          initMap();
           startFarmTimer();
         });
       } else {
@@ -366,12 +363,6 @@
         
         const targetPanel = document.getElementById(btn.dataset.tab);
         targetPanel.classList.add('active');
-        
-        if (btn.dataset.tab === 'tab3' && map) {
-          setTimeout(() => {
-            map.invalidateSize();
-          }, 100);
-        }
       };
     });
 
@@ -493,18 +484,69 @@
       alert(`Quest Completed! Received ${reward} AETH`);
     };
 
-    // TAB 3: GEO-DROPS & MAP
-    function initMap() {
-      if (map) return;
-      map = L.map('map').setView([2.7258, 102.2350], 13);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap'
-      }).addTo(map);
+    // TAB 3: WEBAR CAMERA & GEO-DROPS ENGINE
+    document.getElementById('start-ar-btn').onclick = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { exact: "environment" } },
+          audio: false
+        });
+        arVideo.srcObject = stream;
 
-      map.on('click', (e) => {
-        document.getElementById('geoLat').value = e.latlng.lat.toFixed(6);
-        document.getElementById('geoLng').value = e.latlng.lng.toFixed(6);
-      });
+        arCanvas.width = arCanvas.clientWidth;
+        arCanvas.height = arCanvas.clientHeight;
+
+        isArActive = true;
+        requestAnimationFrame(renderAROverlay);
+        document.getElementById('start-ar-btn').innerText = "AR Active";
+      } catch (err) {
+        alert("Camera access denied or fallback camera in use: " + err.message);
+      }
+    };
+
+    function renderAROverlay() {
+      if (!isArActive) return;
+      ctx.clearRect(0, 0, arCanvas.width, arCanvas.height);
+
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(pos => {
+          const userLat = pos.coords.latitude;
+          const userLng = pos.coords.longitude;
+
+          Object.keys(activeGeoDrops).forEach(id => {
+            const drop = activeGeoDrops[id];
+            if (drop.status === 'active') {
+              const dist = getHaversineDistance(userLat, userLng, drop.lat, drop.lng);
+
+              // Draw nearby drop tags directly on screen
+              if (dist <= 1000) {
+                const centerX = arCanvas.width / 2;
+                const centerY = arCanvas.height / 2;
+
+                const time = Date.now() * 0.003;
+                const size = 25 + Math.sin(time) * 5;
+
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, size, 0, 2 * Math.PI);
+                ctx.strokeStyle = drop.isRandomDrop ? '#38bdf8' : '#22c55e';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                ctx.fillStyle = drop.isRandomDrop ? 'rgba(56, 189, 248, 0.2)' : 'rgba(34, 197, 94, 0.2)';
+                ctx.fill();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '12px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(`${drop.name} (${drop.reward} AETH)`, centerX, centerY - size - 15);
+                ctx.fillText(`Distance: ${dist.toFixed(1)}m`, centerX, centerY - size - 2);
+              }
+            }
+          });
+        }, null, { enableHighAccuracy: true });
+      }
+
+      requestAnimationFrame(renderAROverlay);
     }
 
     document.getElementById('btnUseCurrentLoc').onclick = () => {
@@ -512,10 +554,6 @@
       navigator.geolocation.getCurrentPosition((pos) => {
         document.getElementById('geoLat').value = pos.coords.latitude.toFixed(6);
         document.getElementById('geoLng').value = pos.coords.longitude.toFixed(6);
-        if (map) {
-          map.setView([pos.coords.latitude, pos.coords.longitude], 15);
-          map.invalidateSize();
-        }
       }, () => alert('Unable to acquire current position'), { enableHighAccuracy: true });
     };
 
@@ -552,78 +590,12 @@
       document.getElementById('geoLat').value = '';
       document.getElementById('geoLng').value = '';
       document.getElementById('geoReward').value = '';
-      alert('Custom Geo-Drop successfully appended to the map!');
+      alert('Custom Geo-Drop successfully anchored to Firebase!');
     };
 
     function bindGeoDrops() {
       onValue(ref(db, 'geodrops'), (snapshot) => {
         activeGeoDrops = snapshot.val() || {};
-
-        Object.keys(mapMarkers).forEach(key => map.removeLayer(mapMarkers[key]));
-        mapMarkers = {};
-
-        Object.keys(activeGeoDrops).forEach(id => {
-          const drop = activeGeoDrops[id];
-          if (drop.status === 'active' && map) {
-            const markerType = drop.isRandomDrop ? "Account Random Drop" : "Custom Host Drop";
-            const marker = L.marker([drop.lat, drop.lng]).addTo(map)
-              .bindPopup(`<b>${drop.name}</b> (${markerType})<br>Reward: ${drop.reward} AETH<br>Radius: 1m`);
-            mapMarkers[id] = marker;
-          }
-        });
-      });
-    }
-
-    // NATIVE WEBXR AR ENGINE (THREE.JS)
-    async function startWebXRARSession() {
-      if (!navigator.xr) {
-        return alert("WebXR AR is not supported on this browser/device.");
-      }
-
-      const isSupported = await navigator.xr.isSessionSupported('immersive-ar');
-      if (!isSupported) {
-        return alert("Immersive AR mode is not supported on your device camera.");
-      }
-
-      const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera();
-      
-      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setPixelRatio(window.devicePixelRatio);
-      renderer.xr.enabled = true;
-      document.body.appendChild(renderer.domElement);
-
-      const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-      scene.add(light);
-
-      const geometry = new THREE.CylinderGeometry(0.2, 0.2, 0.04, 32);
-      const material = new THREE.MeshStandardMaterial({ color: 0xFFD700, metalness: 0.8, roughness: 0.2 });
-      const coin = new THREE.Mesh(geometry, material);
-      coin.rotation.x = Math.PI / 2;
-      coin.position.set(0, 0, -1.2);
-      scene.add(coin);
-
-      const session = await navigator.xr.requestSession('immersive-ar', { requiredFeatures: ['hit-test'] });
-      renderer.xr.setSession(session);
-
-      const controller = renderer.xr.getController(0);
-      controller.addEventListener('select', async () => {
-        if (session) {
-          session.end();
-        }
-        await processGeoDropClaim();
-      });
-      scene.add(controller);
-
-      renderer.setAnimationLoop(() => {
-        coin.rotation.z += 0.02;
-        renderer.render(scene, camera);
-      });
-
-      session.addEventListener('end', () => {
-        renderer.setAnimationLoop(null);
-        if (renderer.domElement) renderer.domElement.remove();
       });
     }
 
@@ -645,7 +617,7 @@
           const drop = activeGeoDrops[id];
           if (drop.status === 'active') {
             const dist = getHaversineDistance(userLat, userLng, drop.lat, drop.lng);
-            if (dist <= 1 && dist < minDistance) {
+            if (dist <= 10 && dist < minDistance) {
               minDistance = dist;
               claimedDropId = id;
               claimedDrop = drop;
@@ -654,29 +626,18 @@
         });
 
         if (claimedDropId && claimedDrop) {
-          pendingARClaim = { id: claimedDropId, drop: claimedDrop, dist: minDistance };
-          startWebXRARSession();
+          await remove(ref(db, `geodrops/${claimedDropId}`));
+          const userRef = ref(db, `users/${currentUser.uid}`);
+          const snap = await get(userRef);
+          await update(userRef, { balance: (snap.val().balance || 0) + claimedDrop.reward });
+
+          status.innerText = `Claimed '${claimedDrop.name}' via AR! (+${claimedDrop.reward} AETH) [Dist: ${minDistance.toFixed(2)}m]`;
+          status.style.display = 'block';
         } else {
-          alert('No active Geo-Drops within your 1m radius! Step closer to the coordinate pin.');
+          alert('No active Geo-Drops within your 10m range! Move closer to your anchored drop point.');
         }
       }, () => alert('Unable to fetch device location'), { enableHighAccuracy: true, timeout: 10000 });
     };
-
-    async function processGeoDropClaim() {
-      if (!pendingARClaim) return;
-
-      const { id, drop, dist } = pendingARClaim;
-
-      await remove(ref(db, `geodrops/${id}`));
-      const userRef = ref(db, `users/${currentUser.uid}`);
-      const snap = await get(userRef);
-      await update(userRef, { balance: (snap.val().balance || 0) + drop.reward });
-
-      const status = document.getElementById('geoStatus');
-      status.innerText = `Claimed '${drop.name}' via AR! (+${drop.reward} AETH) [Dist: ${dist.toFixed(2)}m]`;
-      status.style.display = 'block';
-      pendingARClaim = null;
-    }
 
     function getHaversineDistance(lat1, lon1, lat2, lon2) {
       const R = 6371e3;
@@ -697,7 +658,6 @@
         return alert('Please enter a valid Node ID and positive AETH amount');
       }
 
-      // Fast, safe direct lookup in public directory index
       const targetUidSnap = await get(ref(db, `node_index/${targetNodeId}`));
       if (!targetUidSnap.exists()) {
         return alert(`Node ID '${targetNodeId}' not found on Aether Network`);
@@ -715,10 +675,8 @@
 
       if (senderBal < amount) return alert('Insufficient funds to populate escrow lock');
 
-      // Deduct balance from sender
       await update(senderRef, { balance: senderBal - amount });
 
-      // Post Escrow Lock
       const escrowRef = push(ref(db, 'escrows'));
       await set(escrowRef, {
         senderUid: currentUser.uid,
