@@ -8,7 +8,7 @@
   <!-- Leaflet CSS for Map Features -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
-  <!-- A-Frame and AR.js for Web Augmented Reality -->
+  <!-- A-Frame and AR.js -->
   <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   
@@ -74,7 +74,7 @@
       left: 0;
       width: 100vw;
       height: 100vh;
-      z-index: 99999;
+      z-index: 999999;
       background: #000;
     }
     #arInstructions {
@@ -82,7 +82,7 @@
       top: 20px;
       left: 50%;
       transform: translateX(-50%);
-      z-index: 100000;
+      z-index: 1000000;
       background: rgba(15, 23, 42, 0.85);
       padding: 10px 20px;
       border-radius: 20px;
@@ -97,7 +97,7 @@
       bottom: 30px;
       left: 50%;
       transform: translateX(-50%);
-      z-index: 100000;
+      z-index: 1000000;
       padding: 12px 24px;
       background: var(--danger);
       color: #fff;
@@ -221,18 +221,11 @@
     </div>
   </div>
 
-  <!-- FULLSCREEN AR VIEW OVERLAY -->
+  <!-- FULLSCREEN AR VIEW OVERLAY CONTAINER -->
   <div id="arOverlay">
     <div id="arInstructions">Tap the floating coin to claim!</div>
     <button id="btnCloseAR">Exit AR Mode</button>
-
-    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
-      <!-- Spinning 3D Coin Model positioned in front of camera -->
-      <a-entity id="arCoin" class="clickable" position="0 0 -2" animation="property: rotation; to: 0 360 0; loop: true; dur: 2500">
-        <a-cylinder color="#FFD700" height="0.1" radius="0.5" rotation="90 0 0" material="metalness: 0.8; roughness: 0.2;"></a-cylinder>
-      </a-entity>
-      <a-camera raycaster="objects: .clickable" cursor="fuse: false; rayOrigin: mouse"></a-camera>
-    </a-scene>
+    <div id="arSceneContainer" style="width:100%; height:100%;"></div>
   </div>
 
   <!-- Leaflet JS -->
@@ -585,7 +578,45 @@
       });
     }
 
-    // Verify 1m radius and launch AR capture scene
+    // --- DYNAMIC AR LAUNCH & CLEANUP LOGIC ---
+    function launchARScene() {
+      const arContainer = document.getElementById('arSceneContainer');
+      arContainer.innerHTML = `
+        <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
+          <a-entity id="arCoin" class="clickable" position="0 0 -2" animation="property: rotation; to: 0 360 0; loop: true; dur: 2500">
+            <a-cylinder color="#FFD700" height="0.1" radius="0.5" rotation="90 0 0" material="metalness: 0.8; roughness: 0.2;"></a-cylinder>
+          </a-entity>
+          <a-camera raycaster="objects: .clickable" cursor="fuse: false; rayOrigin: mouse"></a-camera>
+        </a-scene>
+      `;
+
+      document.getElementById('arOverlay').style.display = 'block';
+
+      setTimeout(() => {
+        const coin = document.getElementById('arCoin');
+        if (coin) {
+          coin.addEventListener('click', handleARClaim);
+        }
+      }, 500);
+    }
+
+    function closeARScene() {
+      document.getElementById('arOverlay').style.display = 'none';
+      const arContainer = document.getElementById('arSceneContainer');
+      arContainer.innerHTML = '';
+      
+      // Stop active camera streams
+      const video = document.querySelector('video');
+      if (video && video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+        video.remove();
+      }
+      
+      // Clean up injected HTML video elements from AR.js
+      document.querySelectorAll('.a-canvas, video').forEach(el => el.remove());
+      pendingARClaim = null;
+    }
+
     document.getElementById('btnCheckGeo').onclick = () => {
       const status = document.getElementById('geoStatus');
       status.style.display = 'none';
@@ -614,19 +645,18 @@
 
         if (claimedDropId && claimedDrop) {
           pendingARClaim = { id: claimedDropId, drop: claimedDrop, dist: minDistance };
-          document.getElementById('arOverlay').style.display = 'block';
+          launchARScene();
         } else {
           alert('No active Geo-Drops within your 1m radius! Step closer to the coordinate pin.');
         }
       }, () => alert('Unable to fetch device location'), { enableHighAccuracy: true, timeout: 10000 });
     };
 
-    // AR Object Click Event: Claim Reward
-    document.getElementById('arCoin').onclick = async () => {
+    async function handleARClaim() {
       if (!pendingARClaim) return;
 
       const { id, drop, dist } = pendingARClaim;
-      document.getElementById('arOverlay').style.display = 'none';
+      closeARScene();
 
       await remove(ref(db, `geodrops/${id}`));
       const userRef = ref(db, `users/${currentUser.uid}`);
@@ -636,13 +666,10 @@
       const status = document.getElementById('geoStatus');
       status.innerText = `Claimed '${drop.name}' via AR! (+${drop.reward} AETH) [Dist: ${dist.toFixed(2)}m]`;
       status.style.display = 'block';
-
-      pendingARClaim = null;
-    };
+    }
 
     document.getElementById('btnCloseAR').onclick = () => {
-      document.getElementById('arOverlay').style.display = 'none';
-      pendingARClaim = null;
+      closeARScene();
     };
 
     function getHaversineDistance(lat1, lon1, lat2, lon2) {
