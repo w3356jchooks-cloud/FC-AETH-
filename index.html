@@ -7,6 +7,10 @@
   
   <!-- Leaflet CSS for Map Features -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- A-Frame and AR.js for Web Augmented Reality -->
+  <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   
   <style>
     :root {
@@ -61,6 +65,47 @@
 
     .error-msg { color: var(--danger); font-size: 0.85rem; margin-top: 10px; display: none; text-align: center; }
     .success-msg { color: var(--success); font-size: 0.85rem; margin-top: 10px; display: none; }
+
+    /* AR View Overlay Styles */
+    #arOverlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 99999;
+      background: #000;
+    }
+    #arInstructions {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100000;
+      background: rgba(15, 23, 42, 0.85);
+      padding: 10px 20px;
+      border-radius: 20px;
+      border: 1px solid var(--accent);
+      color: #fff;
+      font-size: 0.9rem;
+      pointer-events: none;
+      text-align: center;
+    }
+    #btnCloseAR {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100000;
+      padding: 12px 24px;
+      background: var(--danger);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -136,7 +181,7 @@
     <!-- TAB 3: ACCOUNT GEO-DROPS & CREATOR -->
     <div id="tab3" class="tab-panel">
       <h2>Account Geo-Drops</h2>
-      <p style="color: var(--text-sub); font-size: 0.9rem; margin-top: 5px;">Verify your location within a 1m radius of active drop anchors to collect coin rewards.</p>
+      <p style="color: var(--text-sub); font-size: 0.9rem; margin-top: 5px;">Verify your location within a 1m radius of active drop anchors to collect coin rewards via AR.</p>
       
       <!-- HOST / USER GEO-DROP CREATOR FORM -->
       <div style="margin-top: 15px; background: var(--bg-dark); padding: 15px; border-radius: 8px; border: 1px solid var(--border);">
@@ -154,7 +199,7 @@
       </div>
 
       <div id="map"></div>
-      <button class="btn" id="btnCheckGeo" style="margin-top: 15px;">Claim Nearest Geo-Drop</button>
+      <button class="btn" id="btnCheckGeo" style="margin-top: 15px;">Claim Nearest Geo-Drop (AR)</button>
       <p id="geoStatus" class="success-msg"></p>
     </div>
 
@@ -174,6 +219,20 @@
         <p style="color: var(--text-sub);">Loading escrows...</p>
       </div>
     </div>
+  </div>
+
+  <!-- FULLSCREEN AR VIEW OVERLAY -->
+  <div id="arOverlay">
+    <div id="arInstructions">Tap the floating coin to claim!</div>
+    <button id="btnCloseAR">Exit AR Mode</button>
+
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
+      <!-- Spinning 3D Coin Model positioned in front of camera -->
+      <a-entity id="arCoin" class="clickable" position="0 0 -2" animation="property: rotation; to: 0 360 0; loop: true; dur: 2500">
+        <a-cylinder color="#FFD700" height="0.1" radius="0.5" rotation="90 0 0" material="metalness: 0.8; roughness: 0.2;"></a-cylinder>
+      </a-entity>
+      <a-camera raycaster="objects: .clickable" cursor="fuse: false; rayOrigin: mouse"></a-camera>
+    </a-scene>
   </div>
 
   <!-- Leaflet JS -->
@@ -228,6 +287,7 @@
     let map = null;
     let mapMarkers = {}; 
     let activeGeoDrops = {}; 
+    let pendingARClaim = null;
 
     // --- DOM ELEMENTS ---
     const authScreen = document.getElementById('authScreen');
@@ -525,15 +585,14 @@
       });
     }
 
-    // Claim Nearest Geo-Drop within 1 meter
+    // Verify 1m radius and launch AR capture scene
     document.getElementById('btnCheckGeo').onclick = () => {
       const status = document.getElementById('geoStatus');
       status.style.display = 'none';
 
       if (!navigator.geolocation) return alert('Geolocation unsupported by browser');
 
-      // Request location with high accuracy enabled
-      navigator.geolocation.getCurrentPosition(async (pos) => {
+      navigator.geolocation.getCurrentPosition((pos) => {
         const userLat = pos.coords.latitude;
         const userLng = pos.coords.longitude;
 
@@ -545,7 +604,6 @@
           const drop = activeGeoDrops[id];
           if (drop.status === 'active') {
             const dist = getHaversineDistance(userLat, userLng, drop.lat, drop.lng);
-            // Proximity threshold changed to 1 meter
             if (dist <= 1 && dist < minDistance) {
               minDistance = dist;
               claimedDropId = id;
@@ -555,17 +613,36 @@
         });
 
         if (claimedDropId && claimedDrop) {
-          await remove(ref(db, `geodrops/${claimedDropId}`));
-          const userRef = ref(db, `users/${currentUser.uid}`);
-          const snap = await get(userRef);
-          await update(userRef, { balance: (snap.val().balance || 0) + claimedDrop.reward });
-
-          status.innerText = `Claimed '${claimedDrop.name}'! (+${claimedDrop.reward} AETH) [Dist: ${minDistance.toFixed(2)}m]`;
-          status.style.display = 'block';
+          pendingARClaim = { id: claimedDropId, drop: claimedDrop, dist: minDistance };
+          document.getElementById('arOverlay').style.display = 'block';
         } else {
           alert('No active Geo-Drops within your 1m radius! Step closer to the coordinate pin.');
         }
       }, () => alert('Unable to fetch device location'), { enableHighAccuracy: true, timeout: 10000 });
+    };
+
+    // AR Object Click Event: Claim Reward
+    document.getElementById('arCoin').onclick = async () => {
+      if (!pendingARClaim) return;
+
+      const { id, drop, dist } = pendingARClaim;
+      document.getElementById('arOverlay').style.display = 'none';
+
+      await remove(ref(db, `geodrops/${id}`));
+      const userRef = ref(db, `users/${currentUser.uid}`);
+      const snap = await get(userRef);
+      await update(userRef, { balance: (snap.val().balance || 0) + drop.reward });
+
+      const status = document.getElementById('geoStatus');
+      status.innerText = `Claimed '${drop.name}' via AR! (+${drop.reward} AETH) [Dist: ${dist.toFixed(2)}m]`;
+      status.style.display = 'block';
+
+      pendingARClaim = null;
+    };
+
+    document.getElementById('btnCloseAR').onclick = () => {
+      document.getElementById('arOverlay').style.display = 'none';
+      pendingARClaim = null;
     };
 
     function getHaversineDistance(lat1, lon1, lat2, lon2) {
@@ -659,3 +736,4 @@
   </script>
 </body>
 </html>
+
